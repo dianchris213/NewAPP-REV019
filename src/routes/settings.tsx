@@ -439,7 +439,10 @@ export function FundSourceSheet({ onClose }: { onClose: () => void }) {
     e.preventDefault();
     if (walletPending.add) return;
     const trimmed = name.trim().replace(/\s+/g, " ");
-    const duplicate = wallets.some((w) => w.name.toLowerCase() === trimmed.toLowerCase());
+    // Fund sources are unique per type; the same name may exist under another type.
+    const duplicate = wallets.some(
+      (w) => w.type === type && w.name.toLowerCase() === trimmed.toLowerCase(),
+    );
     if (trimmed.length < 2 || trimmed.length > 24 || duplicate) {
       setError(copy.invalidFundSource);
       announce(copy.invalidFundSource, false);
@@ -486,18 +489,17 @@ export function FundSourceSheet({ onClose }: { onClose: () => void }) {
     }
     setRowError(null);
     setStatus(copy.fundSourceDeleted);
-    toast.success(copy.fundSourceDeleted, {
-      description: target.name,
-      action: {
-        label: copy.undo,
-        onClick: () => {
-          const restored = restoreWallet(target);
-          setStatus(restored ? copy.fundSourceRestored : copy.fundSourceRestoreFailed);
-          if (restored) toast.success(copy.fundSourceRestored, { description: target.name });
-          else toast.error(copy.fundSourceRestoreFailed);
-        },
-      },
-    });
+    setUndoTarget(target);
+  };
+
+  const undoDelete = () => {
+    const target = undoTarget;
+    setUndoTarget(null);
+    if (!target) return;
+    const restored = restoreWallet(target);
+    setStatus(restored ? copy.fundSourceRestored : copy.fundSourceRestoreFailed);
+    if (restored) toast.success(copy.fundSourceRestored, { description: target.name });
+    else toast.error(copy.fundSourceRestoreFailed);
   };
 
   return (
