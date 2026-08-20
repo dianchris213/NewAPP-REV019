@@ -251,10 +251,133 @@ function SettingsPage() {
 }
 
 const WALLET_TYPES: WalletType[] = ["cash", "bank", "ewallet"];
+const FS_QUERY_KEY = "tmab-fund-source-query";
+const FS_TYPE_KEY = "tmab-fund-source-type";
+const isTypeFilter = isOneOf(["all", "cash", "bank", "ewallet"] as const);
+
+/**
+ * Undo snackbar with a visible countdown. Fully keyboard driven: focus lands on
+ * Undo, Enter confirms the undo, Escape dismisses, and focus returns to the
+ * element that was active before it appeared.
+ */
+function UndoSnackbar({
+  title,
+  description,
+  undoLabel,
+  hint,
+  countdownLabel,
+  seconds = 6,
+  onUndo,
+  onDismiss,
+}: {
+  title: string;
+  description: string;
+  undoLabel: string;
+  hint: string;
+  countdownLabel: string;
+  seconds?: number;
+  onUndo: () => void;
+  onDismiss: () => void;
+}) {
+  const [left, setLeft] = useState(seconds);
+  const undoRef = useRef<HTMLButtonElement | null>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
+  const undoCb = useRef(onUndo);
+  const dismissCb = useRef(onDismiss);
+  undoCb.current = onUndo;
+  dismissCb.current = onDismiss;
+
+  useEffect(() => {
+    openerRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    undoRef.current?.focus();
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        dismissCb.current();
+      } else if (e.key === "Enter" && document.activeElement === undoRef.current) {
+        e.preventDefault();
+        e.stopPropagation();
+        undoCb.current();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown, true);
+    const timer = window.setInterval(() => {
+      setLeft((prev) => {
+        if (prev <= 1) {
+          window.clearInterval(timer);
+          dismissCb.current();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("keydown", onKeyDown, true);
+      const opener = openerRef.current;
+      openerRef.current = null;
+      if (opener?.isConnected) opener.focus?.();
+    };
+  }, []);
+
+  const pct = Math.max(0, Math.min(100, (left / seconds) * 100));
+
+  return (
+    <div
+      role="alertdialog"
+      aria-live="assertive"
+      aria-label={`${title} · ${description}`}
+      data-testid="undo-snackbar"
+      className="fixed inset-x-0 bottom-4 z-[200] mx-auto w-[min(92vw,26rem)] overflow-hidden rounded-[18px] border border-outline-variant/25 bg-surface-container-high p-4 shadow-2xl"
+    >
+      <div className="flex items-center gap-3">
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="truncate text-[13px] font-bold text-on-surface">{title}</span>
+          <span className="truncate text-[11px] text-on-surface-variant/80">{description}</span>
+        </span>
+        <span
+          data-testid="undo-countdown"
+          aria-hidden="true"
+          className="shrink-0 text-[11px] font-semibold tabular-nums text-on-surface-variant"
+        >
+          {`${countdownLabel} ${left}s`}
+        </span>
+        <button
+          type="button"
+          ref={undoRef}
+          data-testid="undo-action"
+          onClick={onUndo}
+          className="shrink-0 rounded-full bg-primary-container/40 px-4 py-2 text-[12px] font-bold text-primary focus-visible:ring-2 focus-visible:ring-primary/60"
+        >
+          {undoLabel}
+        </button>
+        <button
+          type="button"
+          aria-label="Tutup"
+          data-testid="undo-dismiss"
+          onClick={onDismiss}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-variant text-on-surface-variant focus-visible:ring-2 focus-visible:ring-primary/60"
+        >
+          <Icon name="close" className="text-[16px]" />
+        </button>
+      </div>
+      <p className="mt-2 mb-0 text-[10px] text-on-surface-variant/70">{hint}</p>
+      <span aria-hidden="true" className="mt-2 block h-1 rounded-full bg-surface-variant">
+        <span
+          className="block h-1 rounded-full bg-primary transition-[width] duration-1000 ease-linear"
+          style={{ width: `${pct}%` }}
+        />
+      </span>
+    </div>
+  );
+}
 
 /** Manage user-owned fund sources (Sumber Dana). Empty by default. */
 export function FundSourceSheet({ onClose }: { onClose: () => void }) {
   const {
+    hydrated,
     language,
     wallets,
     addWallet,
@@ -273,9 +396,21 @@ export function FundSourceSheet({ onClose }: { onClose: () => void }) {
   const [editingName, setEditingName] = useState("");
   const [rowError, setRowError] = useState<{ id: string; message: string } | null>(null);
   const [status, setStatus] = useState("");
-  const [query, setQuery] = useState("");
-  const [typeFilter, setTypeFilter] = useState<WalletType | "all">("all");
+  const [query, setQuery, resetQuery] = usePersistentState<string>(FS_QUERY_KEY, "", isString);
+  const [typeFilter, setTypeFilter, resetTypeFilter] = usePersistentState<WalletType | "all">(
+    FS_TYPE_KEY,
+    "all",
+    isTypeFilter,
+  );
   const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [undoTarget, setUndoTarget] = useState<Wallet | null>(null);
+  const nameRef = useRef<HTMLInputElement | null>(null);
+  const filtersDirty = !!query.trim() || typeFilter !== "all";
+
+  const resetFilters = () => {
+    resetQuery();
+    resetTypeFilter();
+  };
 
   const list = useMemo(
     () => {
