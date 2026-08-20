@@ -560,6 +560,7 @@ export function FundSourceSheet({ onClose }: { onClose: () => void }) {
               autoComplete="off"
               data-autofocus
               data-testid="fund-source-name"
+              ref={nameRef}
               aria-invalid={!!error}
               aria-errormessage={error ? "fund-source-error" : undefined}
               aria-describedby="fund-source-hint"
