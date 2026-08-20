@@ -604,7 +604,7 @@ export function FundSourceSheet({ onClose }: { onClose: () => void }) {
         </p>
 
         {wallets.length ? (
-          <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
             <input
               type="search"
               value={query}
@@ -630,9 +630,24 @@ export function FundSourceSheet({ onClose }: { onClose: () => void }) {
                 </option>
               ))}
             </select>
+            {filtersDirty ? (
+              <button
+                type="button"
+                data-testid="fund-source-reset-filter"
+                onClick={resetFilters}
+                className="h-11 shrink-0 rounded-2xl border border-outline-variant/30 px-4 text-[12px] font-semibold text-on-surface-variant focus-visible:ring-2 focus-visible:ring-primary/60"
+              >
+                {copy.resetFilter}
+              </button>
+            ) : null}
           </div>
         ) : null}
 
+        {!hydrated ? (
+          <div className="mt-4 rounded-2xl bg-surface-container px-4 py-2">
+            <ListSkeleton rows={3} label={copy.loadingFundSources} testId="fund-source-skeleton" />
+          </div>
+        ) : (
         <ul
           aria-label={copy.fundSources}
           aria-busy={walletPending.add}
@@ -774,62 +789,139 @@ export function FundSourceSheet({ onClose }: { onClose: () => void }) {
           ) : (
             <li
               data-testid="fund-source-empty"
-              className="py-4 text-center text-[12px] text-on-surface-variant/70"
+              className="flex flex-col items-center gap-3 px-3 py-6 text-center"
             >
-              {wallets.length ? copy.noFundSourceResults : copy.fundSourcesEmpty}
+              <span className="flex h-12 w-12 items-center justify-center rounded-full bg-surface-variant text-primary">
+                <Icon name="account_balance_wallet" className="text-[22px]" />
+              </span>
+              <span className="text-[13px] font-bold text-on-surface">
+                {wallets.length ? copy.noFundSourceResults : copy.emptyFundSourceTitle}
+              </span>
+              <span className="text-[11px] text-on-surface-variant/80">
+                {wallets.length ? copy.emptyTypeHint : copy.emptyFundSourceBody}
+              </span>
+              {wallets.length ? (
+                <button
+                  type="button"
+                  data-testid="fund-source-empty-reset"
+                  onClick={resetFilters}
+                  className="rounded-full border border-outline-variant/30 px-4 py-2 text-[12px] font-semibold text-on-surface-variant focus-visible:ring-2 focus-visible:ring-primary/60"
+                >
+                  {copy.resetFilter}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  data-testid="fund-source-empty-cta"
+                  onClick={() => nameRef.current?.focus()}
+                  className="gradient-primary rounded-full px-5 py-2.5 text-[12px] font-bold text-on-primary-container focus-visible:ring-2 focus-visible:ring-primary/60"
+                >
+                  {copy.addFundSource}
+                </button>
+              )}
             </li>
           )}
         </ul>
+        )}
 
         {confirmTarget ? (
-          <div
-            className="fixed inset-0 z-[190] flex items-center justify-center bg-black/60 p-5 backdrop-blur-sm"
-            onClick={() => setConfirmId(null)}
-          >
-            <div
-              role="alertdialog"
-              aria-modal="true"
-              aria-labelledby="fund-source-confirm-title"
-              aria-describedby="fund-source-confirm-body"
-              data-testid="fund-source-confirm"
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-sm rounded-[22px] border border-outline-variant/20 bg-surface-container-high p-5 shadow-2xl"
-            >
-              <h4
-                id="fund-source-confirm-title"
-                className="m-0 text-[15px] font-bold text-on-surface"
-              >
-                {copy.confirmDeleteFundSourceTitle}
-              </h4>
-              <p
-                id="fund-source-confirm-body"
-                className="mt-2 text-[12px] text-on-surface-variant/80"
-              >
-                {confirmTarget.name} · {copy.confirmDeleteFundSourceBody}
-              </p>
-              <div className="mt-4 flex gap-2">
-                <button
-                  type="button"
-                  data-testid="fund-source-confirm-cancel"
-                  onClick={() => setConfirmId(null)}
-                  className="h-11 flex-1 rounded-full bg-surface-variant text-[13px] font-semibold text-on-surface-variant focus-visible:ring-2 focus-visible:ring-primary/60"
-                >
-                  {copy.cancel}
-                </button>
-                <button
-                  type="button"
-                  autoFocus
-                  data-testid="fund-source-confirm-delete"
-                  disabled={!!walletPending.byId[confirmTarget.id]}
-                  onClick={() => void remove(confirmTarget.id)}
-                  className="h-11 flex-1 rounded-full border border-error/40 bg-error/15 text-[13px] font-bold text-error focus-visible:ring-2 focus-visible:ring-primary/60 disabled:opacity-60"
-                >
-                  {copy.confirmDelete}
-                </button>
-              </div>
-            </div>
-          </div>
+          <ConfirmDeleteDialog
+            title={copy.confirmDeleteFundSourceTitle}
+            body={`${confirmTarget.name} · ${copy.confirmDeleteFundSourceBody}`}
+            cancelLabel={copy.cancel}
+            confirmLabel={copy.confirmDelete}
+            busy={!!walletPending.byId[confirmTarget.id]}
+            onCancel={() => setConfirmId(null)}
+            onConfirm={() => void remove(confirmTarget.id)}
+          />
         ) : null}
+
+        {undoTarget ? (
+          <UndoSnackbar
+            title={copy.fundSourceDeleted}
+            description={undoTarget.name}
+            undoLabel={copy.undo}
+            hint={copy.undoHint}
+            countdownLabel={copy.undoIn}
+            onUndo={undoDelete}
+            onDismiss={() => setUndoTarget(null)}
+          />
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Destructive confirmation with a real focus trap: Escape cancels, Enter
+ * confirms, and focus returns to the row's delete button afterwards.
+ */
+function ConfirmDeleteDialog({
+  title,
+  body,
+  cancelLabel,
+  confirmLabel,
+  busy,
+  onCancel,
+  onConfirm,
+}: {
+  title: string;
+  body: string;
+  cancelLabel: string;
+  confirmLabel: string;
+  busy: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const dialogRef = useModalA11y<HTMLDivElement>(true, onCancel);
+  return (
+    <div
+      className="fixed inset-0 z-[190] flex items-center justify-center bg-black/60 p-5 backdrop-blur-sm"
+      onClick={onCancel}
+    >
+      <div
+        ref={dialogRef}
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="fund-source-confirm-title"
+        aria-describedby="fund-source-confirm-body"
+        data-testid="fund-source-confirm"
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !busy) {
+            e.preventDefault();
+            e.stopPropagation();
+            onConfirm();
+          }
+        }}
+        className="w-full max-w-sm rounded-[22px] border border-outline-variant/20 bg-surface-container-high p-5 shadow-2xl"
+      >
+        <h4 id="fund-source-confirm-title" className="m-0 text-[15px] font-bold text-on-surface">
+          {title}
+        </h4>
+        <p id="fund-source-confirm-body" className="mt-2 text-[12px] text-on-surface-variant/80">
+          {body}
+        </p>
+        <div className="mt-4 flex gap-2">
+          <button
+            type="button"
+            data-testid="fund-source-confirm-cancel"
+            onClick={onCancel}
+            className="h-11 flex-1 rounded-full bg-surface-variant text-[13px] font-semibold text-on-surface-variant focus-visible:ring-2 focus-visible:ring-primary/60"
+          >
+            {cancelLabel}
+          </button>
+          <button
+            type="button"
+            data-autofocus
+            data-testid="fund-source-confirm-delete"
+            disabled={busy}
+            onClick={onConfirm}
+            className="h-11 flex-1 rounded-full border border-error/40 bg-error/15 text-[13px] font-bold text-error focus-visible:ring-2 focus-visible:ring-primary/60 disabled:opacity-60"
+          >
+            {confirmLabel}
+          </button>
+        </div>
       </div>
     </div>
   );
