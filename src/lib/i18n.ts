@@ -87,6 +87,13 @@ type Dict = {
   undo: string;
   fundSourceRestored: string;
   fundSourceRestoreFailed: string;
+  loadingFundSources: string;
+  undoIn: string;
+  undoHint: string;
+  resetFilter: string;
+  emptyFundSourceTitle: string;
+  emptyFundSourceBody: string;
+  emptyTypeHint: string;
 };
 
 const dictionaries: Record<Language, Dict> = {
@@ -177,6 +184,13 @@ const dictionaries: Record<Language, Dict> = {
     undo: "Urungkan",
     fundSourceRestored: "Sumber dana dipulihkan",
     fundSourceRestoreFailed: "Gagal memulihkan sumber dana.",
+    loadingFundSources: "Memuat sumber dana…",
+    undoIn: "Urungkan dalam",
+    undoHint: "Tekan Enter untuk urungkan, Esc untuk tutup.",
+    resetFilter: "Reset filter",
+    emptyFundSourceTitle: "Belum ada Sumber Dana",
+    emptyFundSourceBody: "Buat Sumber Dana pertama Anda untuk mulai mencatat kantong dan saldo.",
+    emptyTypeHint: "Pilih Jenis lalu isi nama Sumber Dana.",
   },
   en: {
     settingsEyebrow: "Configuration",
@@ -265,6 +279,13 @@ const dictionaries: Record<Language, Dict> = {
     undo: "Undo",
     fundSourceRestored: "Fund source restored",
     fundSourceRestoreFailed: "Could not restore fund source.",
+    loadingFundSources: "Loading fund sources…",
+    undoIn: "Undo in",
+    undoHint: "Press Enter to undo, Esc to dismiss.",
+    resetFilter: "Reset filter",
+    emptyFundSourceTitle: "No fund sources yet",
+    emptyFundSourceBody: "Create your first fund source to start tracking pockets and balances.",
+    emptyTypeHint: "Pick a type, then name the fund source.",
   },
 };
 
