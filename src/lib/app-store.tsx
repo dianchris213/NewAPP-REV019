@@ -415,9 +415,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         ...(input.provider?.trim() ? { provider: input.provider.trim() } : {}),
       };
       setWalletPending((prev) => ({ ...prev, add: true }));
-      // Optimistic insert: the card appears instantly, duplicates are rejected.
+      // Optimistic insert: the card appears instantly. Duplicates are rejected
+      // only inside the same Sumber Dana (type + provider).
       setWallets((prev) => {
-        if (prev.some((w) => w.name.toLowerCase() === name.toLowerCase())) return prev;
+        if (isPocketNameTaken(prev, { name, type: wallet.type, provider: wallet.provider }))
+          return prev;
         ok = true;
         return [...prev, wallet];
       });
@@ -453,9 +455,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setWallets((prev) => {
         const target = prev.find((w) => w.id === id);
         if (!target) return prev;
-        const duplicate = prev.some(
-          (w) => w.id !== id && w.name.toLowerCase() === name.toLowerCase(),
-        );
+        const duplicate = isPocketNameTaken(prev, {
+          name,
+          type: target.type,
+          provider: target.provider,
+          ignoreId: id,
+        });
         if (duplicate || target.name === name) {
           if (target.name === name) {
             ok = true;
@@ -516,7 +521,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (!wallet?.id || !wallet.name) return false;
       let ok = false;
       setWallets((prev) => {
-        if (prev.some((w) => w.id === wallet.id || w.name.toLowerCase() === wallet.name.toLowerCase()))
+        if (
+          prev.some((w) => w.id === wallet.id) ||
+          isPocketNameTaken(prev, {
+            name: wallet.name,
+            type: wallet.type,
+            provider: wallet.provider,
+          })
+        )
           return prev;
         ok = true;
         return [...prev, wallet];
