@@ -128,6 +128,31 @@ export const WALLET_PROVIDERS: Record<WalletType, string[]> = {
 
 const STORAGE_KEY = "tmab-state-v1";
 
+/**
+ * Identity of a "Sumber Dana" (fund source): its type + provider name.
+ * Pocket (kantong) names are unique *within* one fund source only, so the same
+ * name may be reused under a different fund source.
+ */
+export function fundSourceKey(input: { type: WalletType; provider?: string | undefined }) {
+  return `${input.type}::${(input.provider ?? "").trim().toLowerCase()}`;
+}
+
+/** Pure duplicate check used by the store and by the forms (and by tests). */
+export function isPocketNameTaken(
+  wallets: Wallet[],
+  input: { name: string; type: WalletType; provider?: string | undefined; ignoreId?: string },
+) {
+  const name = input.name.trim().replace(/\s+/g, " ").toLowerCase();
+  if (!name) return false;
+  const key = fundSourceKey(input);
+  return wallets.some(
+    (w) =>
+      w.id !== input.ignoreId &&
+      fundSourceKey(w) === key &&
+      w.name.trim().toLowerCase() === name,
+  );
+}
+
 const defaultSettings: Settings = {
   darkTheme: true,
   pushNotifications: false,
