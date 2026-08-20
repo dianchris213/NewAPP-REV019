@@ -1,18 +1,21 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { AppShell, TopBar } from "@/components/AppShell";
 import { Icon } from "@/components/Icon";
+import { ListSkeleton } from "@/components/Skeleton";
 import { useModalA11y } from "@/hooks/use-modal-a11y";
 import {
   useApp,
   WALLET_TYPE_LABEL,
   formatIDR,
+  type Wallet,
   type Language,
   type Settings as SettingsState,
   type TxType,
   type WalletType,
 } from "@/lib/app-store";
+import { isOneOf, isString, usePersistentState } from "@/lib/persistent-filter";
 import { t } from "@/lib/i18n";
 
 export const Route = createFileRoute("/settings")({
